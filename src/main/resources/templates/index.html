@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+    <script type="text/javascript" th:src="@{/webjars/bootstrap/js/bootstrap.min.js}"></script>
+</head>
+<body>
+<div class="mx-auto" style="width: 700px">
+
+
+    <div class="text-center mt-4">
+        <h1>Home Page</h1>
+    </div>
+
+    <table class="table mt-4">
+        <thead class="text-bg-primary">
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">First Name</th>
+            <th scope="col">Last Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Handle</th>
+        </tr>
+        </thead>
+        <tbody>
+        <th:block th:each="user: ${users}">
+            <tr th:user="${user.getId()}" class="user-row">
+                <th scope="row" th:text="${user.id}"></th>
+                <td th:text="${user.firstName}"></td>
+                <td th:text="${user.lastName}"></td>
+                <td th:text="${user.email}"></td>
+                <td>
+                    <button type="button" class="btn btn-primary btn-sm" data-action="edit">Edit</button>
+                    <button type="button" class="btn btn-danger btn-sm" data-action="delete">Delete</button>
+                </td>
+            </tr>
+        </th:block>
+        </tbody>
+    </table>
+
+    <button type="button" class="btn btn-primary add-btn">Add New</button>
+
+
+    <!-- Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="exampleModalLabel">Modal title</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="inputFirstName" class="form-label">
+                                First Name
+                            </label>
+                            <input type="text" class="form-control" id="inputFirstName">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="inputLastName" class="form-label">
+                                Last Name
+                            </label>
+                            <input type="text" class="form-control" id="inputLastName">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="inputEmail" class="form-label">
+                                Email
+                            </label>
+                            <input type="email" class="form-control" id="inputEmail">
+                        </div>
+
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary submit-btn">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+
+        let users = /*[[${users}]]*/ [];
+
+        const deleteUser = async (id) => {
+            const response = await fetch(`/api/customer/${id}`, {
+                method: 'DELETE'
+            })
+            if (response.ok) {
+                const userRow = document.querySelector(`.user-row[user="${id}"]`);
+                userRow.remove();
+                users = users.filter(user => user.id !== id);
+            }
+        }
+
+        const setUpModal = (user) => {
+            const myModal = document.querySelector('#exampleModal')
+            // setup modal
+            const modalTitle = myModal.querySelector('#exampleModalLabel');
+            modalTitle.textContent = user ? 'Edit User' : 'Add User';
+
+            const inputFirstName = myModal.querySelector('#inputFirstName');
+            inputFirstName.value = user ? user.firstName : '';
+
+            const inputLastName = myModal.querySelector('#inputLastName');
+            inputLastName.value = user ? user.lastName : '';
+
+            const inputEmail = myModal.querySelector('#inputEmail');
+            inputEmail.value = user ? user.email : '';
+
+            myModal.querySelector('.submit-btn').textContent = user ? 'Update' : 'Add';
+
+            myModal.setAttribute('user', user ? user.id : '');
+
+
+            const modal = new bootstrap.Modal(myModal)
+            modal.show()
+        }
+
+        document.querySelector('.add-btn').addEventListener('click', () => setUpModal())
+
+        document.querySelectorAll('.user-row').forEach((row, index) => {
+            row.addEventListener('click', (event) => {
+                const action = event.target.dataset.action;
+                if(!['delete', 'edit'].includes(action)) {
+                    return
+                }
+
+                if(action === 'delete') {
+                    const userDelete = users[index];
+                    deleteUser(userDelete.id);
+                } else {
+                    setUpModal(users[index]);
+                }
+
+            });
+        });
+
+        // update + new user
+        const upsertUser = async () => {
+            const myModal = document.querySelector('#exampleModal')
+            const inputFirstName = myModal.querySelector('#inputFirstName');
+            const inputLastName = myModal.querySelector('#inputLastName');
+            const inputEmail = myModal.querySelector('#inputEmail');
+
+            if(inputFirstName.value === '' || inputLastName.value === '' || inputEmail.value === '') {
+                alert('Please fill all fields');
+                return;
+            }
+
+            const user = {
+                firstName: inputFirstName.value,
+                lastName: inputLastName.value,
+                email: inputEmail.value
+            }
+
+            const id = myModal.getAttribute('user');
+            if(id) {
+                user.id = id;
+            }
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/customer/${id}` : '/api/customer';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(user)
+                })
+                if(res.ok) {
+                    const userRes = await res.text()
+                    if(id) {
+                        const userRow = document.querySelector(`.user-row[user="${id}"]`);
+                        userRow.querySelector('td:nth-child(2)').textContent = user.firstName;
+                        userRow.querySelector('td:nth-child(3)').textContent = user.lastName;
+                        userRow.querySelector('td:nth-child(4)').textContent = user.email;
+                    } else {
+
+                        const newID = Number(userRes)
+                        if(newID) {
+                            user.id = newID;
+                            users.push(user);
+
+                            const userRow = document.querySelector('.user-row').cloneNode(true);
+                            userRow.querySelector('td:nth-child(2)').textContent = user.firstName;
+                            userRow.querySelector('td:nth-child(3)').textContent = user.lastName;
+                            userRow.querySelector('td:nth-child(4)').textContent = user.email;
+                            userRow.setAttribute('user', user.id);
+                            document.querySelector('tbody').appendChild(userRow);
+                        }
+                    }
+                    myModal.querySelector('.btn-close').click();
+                }
+            } catch (e) {
+                // handle error
+            }
+
+        }
+
+        document.querySelector('.submit-btn').addEventListener('click', upsertUser)
+
+
+        /*]]>*/
+    </script>
+
+</div>
+</body>
+
+</html>
